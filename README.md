@@ -1,7 +1,7 @@
 # CardioInsight: Mobile App for Cardiovascular Health Monitoring and Risk Assessment
 
 ## Description
-**CardioInsight** is a mobile app developed with React Native and Expo for monitoring cardiovascular health and risk assessment. It uses Firebase for database management and authentication, and a TabNet Classifier model in Python for predicting cardiovascular diseases.
+**CardioInsight** is a mobile app developed with React Native and Expo for monitoring cardiovascular health and risk assessment. It uses Firebase for database management and authentication and a TabNet Classifier model in Python for predicting cardiovascular diseases.
 
 ## System Requirements
 - Node.js
@@ -15,86 +15,41 @@
 
 ### Frontend (React Native + Expo)
 
-1. **Install Node.js**: [Node.js Download](https://nodejs.org/)
-2. **Install Expo CLI**: npm install -g expo-cli
-3. **Clone the repository**:
+1. **Download and Install Node.js**
+2. **Install Expo CLI**:
+   npm install -g expo-cli
+4. **Clone the repository**:
+    - git clone [(https://github.com/IuliaMZbircea/CardioInsightApp)](https://github.com/IuliaMZbircea/CardioInsightApp)
+    - cd CardioInsight
 
-    git clone https://github.com/username/CardioInsight.git
-    cd CardioInsight/frontend
-
-4. **Install project dependencies**:
-    ```sh
-    npm install
-    ```
+5. **Install project dependencies**:
+    - npm install
 
 ### Backend (Flask + Python)
 
-1. **Install Python 3.x**: [Python Download](https://www.python.org/downloads/)
-2. **Create and activate a virtual environment**:
-    ```sh
-    python -m venv venv
-    source venv/bin/activate  # For Windows: venv\Scripts\activate
-    ```
+1. **Install Python 3.x**
 3. **Install dependencies**:
-    ```sh
-    pip install -r requirements.txt
-    ```
+    - pip install -r requirements.txt
 4. **Configure Firebase**:
     - Create a Firebase project and add the configuration to the React Native app.
-    - Set up Firebase Authentication and Realtime Database or Firestore.
-
+    - Set up Firebase Authentication and Firestore.
 ## Launch Steps
 
 ### Frontend (React Native + Expo)
 
 1. **Start the Expo app**:
-    ```sh
-    expo start
-    ```
-2. **Scan the QR code** from the terminal with the Expo Go app to launch the app on your mobile device.
+    - npx expo start
+2. **Scan the QR code** from the terminal with the Expo Go app to launch the app on your mobile/simulator device
 
 ### Backend (Flask + Python)
 
-1. **Run the Flask server**:
-    ```sh
-    cd backend
-    flask run
-    ```
-2. **Ensure the Flask server is accessible to the mobile app.** Use a tunneling service like ngrok to make the local server accessible via a public URL:
-    ```sh
-    ngrok http 5000
-    ```
+1. **Run the server**:
+    python3 server.py
 
 ## Usage
 
 1. **Register or log in** using Firebase Authentication.
-2. **Enter health data** in the mobile app.
-3. **Receive risk assessment** based on the TabNet model implemented in the backend.
+2. **Choose user type and enter health data** Choose to be either a basic user or an advanced one.
+3. **Receive risk assessment and Wellness Score** Go straight to Insights for a better look at your data and lifestyle recommendations for improving cardiovascular health.
+4. **Add and review past entries of medical files** See the evolution of your progress.
 
-## Contribution
-
-1. **Clone the repository**:
-    ```sh
-    git clone https://github.com/username/CardioInsight.git
-    cd CardioInsight
-    ```
-2. **Create a new branch**:
-    ```sh
-    git checkout -b feature/your-feature
-    ```
-3. **Make your changes** and commit:
-    ```sh
-    git commit -m "Add your message"
-    ```
-4. **Push your changes**:
-    ```sh
-    git push origin feature/your-feature
-    ```
-
-5. **Open a Pull Request** on GitHub.
-
-## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Contact
-For questions or suggestions, please contact me at [email@example.com](mailto:email@example.com).
