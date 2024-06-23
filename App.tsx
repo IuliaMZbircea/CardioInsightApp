@@ -8,6 +8,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { app, authentication, firestore_db } from './firebaseConfig';
 import AdvancedUserScreen from './src/screens/AdvancedUser';
 import LoginScreen from './src/screens/Login';
+import BasicUserScreen from './src/screens/BasicUser';
 import SignupScreen from './src/screens/Signup';
 import ProfileScreen from './src/screens/UserProfile';
 import UserTypeSelectionScreen from './src/screens/UserTypeSelection';
@@ -15,21 +16,41 @@ import MedicalHistoryScreen from './src/screens/MedicalHistory';
 import ParameterDetailsScreen from './src/screens/Details';
 import SettingsScreen from './src/screens/Settings';
 import InsightsScreen from './src/screens/Insights';
+import NewMedicalRecordScreen from './src/screens/AddInfo';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { getDoc, doc } from 'firebase/firestore';
+import * as Sentry from '@sentry/react-native';
+import { Integrations } from '@sentry/tracing';
+
+Sentry.init({
+  dsn: 'https://fcfc70e7dbfa853a828dc8fdf38edf19@o4507473219551232.ingest.de.sentry.io/4507473221714000',
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // enableSpotlight: __DEV__,
+  tracesSampleRate: 1.0,
+  integrations: [new Integrations.BrowserTracing()],
+  _experiments: {
+    // profilesSampleRate is relative to tracesSampleRate.
+    // Here, we'll capture profiles for 100% of transactions.
+    profilesSampleRate: 1.0,
+  },
+});
 
 export type RootStackParamList = {
   LoginScreen: undefined;
   SignupScreen: undefined;
   ProfileScreen: undefined;
   AdvancedUserScreen: undefined;
+  BasicUserScreen: undefined;
   UserTypeSelectionScreen: { user: User };
   MedicalHistoryStack: undefined;
   ParameterDetailsScreen: undefined;
   SettingsScreen: undefined;
+  NewMedicalRecordScreen: undefined;
   Tabs: undefined;
   MedicalHistoryScreen: undefined;
   InsightsScreen: undefined;
+  SettingsStack:undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -66,6 +87,22 @@ const InsightsStack = () => (
 
 );
 
+const SettingsStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen
+      name="SettingsScreen"
+      component={SettingsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="NewMedicalRecordScreen"
+      component={NewMedicalRecordScreen}
+      options={{ headerShown: false }}
+    />
+  </Stack.Navigator>
+
+);
+
 const TabNavigator = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
@@ -76,7 +113,7 @@ const TabNavigator = () => (
           iconName = 'document-outline';
         } else if (route.name === 'ProfileScreen') {
           iconName = 'person-outline';
-        } else if (route.name === 'SettingsScreen') {
+        } else if (route.name === 'SettingsStack') {
           iconName = 'settings-outline';
         }
 
@@ -118,8 +155,8 @@ const TabNavigator = () => (
       }}
     />
     <Tab.Screen
-      name="SettingsScreen"
-      component={SettingsScreen}
+      name="SettingsStack"
+      component={SettingsStack}
       options={{
         title: 'Settings',
         headerStyle: {
@@ -145,12 +182,12 @@ const App = () => {
         console.log("User is signed in:", currentUser);
         setUser(currentUser);
         const userDoc = await getDoc(doc(firestore_db, 'MedicalFiles', currentUser.uid));
-        if (userDoc.exists() && userDoc.data().hasSelectedUserType) {
-          console.log("User has selected user type. Setting initial route to Tabs.");
-          setInitialRoute('Tabs');
-        } else {
+        if (userDoc.exists() && !userDoc.data().hasSelectedUserType) {
           console.log("User has not selected user type. Setting initial route to UserTypeSelectionScreen.");
           setInitialRoute('UserTypeSelectionScreen');
+        } else {
+          console.log("User has selected user type. Setting initial route to Tabs.");
+          setInitialRoute('Tabs');
         }
       } else {
         console.log("No user is signed in. Setting initial route to LoginScreen.");
@@ -175,7 +212,9 @@ const App = () => {
             <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
             <Stack.Screen name="UserTypeSelectionScreen" component={UserTypeSelectionScreen} options={{headerShown : false}}/>
             <Stack.Screen name="AdvancedUserScreen" component={AdvancedUserScreen} options={{headerShown : false}}/>
-            {/* <Stack.Screen name="BasicUserScreen" component={BasicUserScreen} /> */}
+            <Stack.Screen name="BasicUserScreen" component={BasicUserScreen} options={{headerShown : false}} />
+            <Stack.Screen name="NewMedicalRecordScreen" component={NewMedicalRecordScreen} options={{headerShown : false}} />
+            
 
           </>
         ) : (
@@ -190,4 +229,7 @@ const App = () => {
 };
 
 
+
+
 export default App;
+

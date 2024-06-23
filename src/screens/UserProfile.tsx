@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { authentication, firestore_db } from '../../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import axios from 'axios';
 
 type ParameterRanges = {
@@ -62,50 +62,101 @@ const ProfileScreen = () => {
   const navigation = useNavigation<any>();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
   const [wellnessScore, setWellnessScore] = useState<number | null>(null);
-  const [riskOf, setRiskOf] = useState<string>("");
+  const [riskOf, setRiskOf] = useState<string>("Calculating risk...");
+  const [showSpan, setShowSpan] = useState(false);
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const currentUser = authentication.currentUser;
-        if (currentUser) {
-          const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setProfileData(data);
-            const score = calculateWellnessScore(data?.userData);
-            setWellnessScore(score);
-
-            // Fetch risk prediction
-            const response = await axios.post('https://cardioinsight-4532f645d273.herokuapp.com/server.py ', { userData: data.userData });
-            setRiskOf(response.data.predicted_disease);
-          } else {
-            console.log('No such document!');
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfileData();
   }, []);
 
-  const normalize = (value: number, min: number, max: number): number => {
-    if (value <= min) return 0;
-    if (value >= max) return 1;
-    return (value - min) / (max - min);
+  const fetchProfileData = async () => {
+    try {
+      const currentUser = authentication.currentUser;
+      if (currentUser) {
+        console.log('Fetching profile data for user:', currentUser.uid);
+        const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUser(data);
+          console.log('User profile data:', data);
+
+          // Fetch the latest entry from userData subcollection
+          const userDataCollectionRef = collection(docRef, 'userData');
+          const q = query(userDataCollectionRef, orderBy('createdAt', 'desc'), limit(1));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const latestUserData = querySnapshot.docs[0].data();
+            setProfileData(latestUserData);
+            console.log('Latest user data:', profileData);
+
+            const score = calculateWellnessScore(profileData);
+            setWellnessScore(score);
+            console.log('Calculated wellness score:', score);
+
+            const dataToSend = {
+              SEX: parseInt(profileData.sex),
+  AGE: parseInt(profileData.age),
+  CURSMOKE: parseInt(profileData.smoker),
+  PREVCHD: parseInt(profileData.prevCHD),
+  TOTCHOL: parseFloat(profileData.chol),
+  SYSBP: parseFloat(profileData.systolicBP),
+  DIABP: parseFloat(profileData.diastolicBP),
+  BMI: parseFloat(profileData.BMI),
+  HEARTRTE: parseFloat(profileData.hr),
+  GLUCOSE: parseFloat(profileData.glucose),
+
+            };
+            handlePredictClick(dataToSend);
+           
+      
+    } }}}catch (error) {
+      console.error('Error fetching profile data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getCurrentDate = (): string => {
-    const date = new Date();
-    const options = { year: 'numeric', month: 'short', day: '2-digit' } as const;
-    return date.toLocaleDateString('en-US', options);
-  };
+  const handlePredictClick = async (latestUserData: { SEX: number; AGE: number; CURSMOKE: number; PREVCHD: number; TOTCHOL: number; SYSBP: number; DIABP: number; BMI: number; HEARTRTE: number; GLUCOSE: number; }) => {
+    const url = "http://localhost:5002/predict";
+    setLoading(true);
+
+    // Add a log to verify userData
+    console.log('Data to send:', latestUserData);
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+            },
+            method: "POST",
+            body: JSON.stringify(latestUserData), // Ensure userData is stringified here
+        });
+
+        const responseData = await response.json();
+        if (response.ok) {
+            setRiskOf(responseData.predicted_disease);
+        } else {
+            console.error('Error in API response:', responseData.error);
+        }
+    } catch (error) {
+        console.error('Error in API call:', error);
+    } finally {
+        setLoading(false);
+        setShowSpan(true);
+    }
+};
+
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfileData();
+    }, [])
+  );
 
   const calculateParameterScore = (paramName: keyof ParameterRanges, value: any): number => {
     const range = parameterRanges[paramName];
@@ -134,6 +185,12 @@ const ProfileScreen = () => {
     return Math.round(wellnessScore * 100) / 100;
   };
 
+  const normalize = (value: number, min: number, max: number): number => {
+    if (value <= min) return 0;
+    if (value >= max) return 1;
+    return (value - min) / (max - min);
+  };
+
   const handleInfoButton = () => {
     Alert.alert(
       'Info',
@@ -146,11 +203,16 @@ const ProfileScreen = () => {
     navigation.navigate("InsightsScreen");
   };
 
+  function getCurrentDate(): React.ReactNode {
+    const date = new Date();
+    return date.toDateString();
+  }
+
   if (loading) {
     return <ActivityIndicator size="large" color="rgba(200, 48, 48, 0.6)" />;
   }
 
-  if (!profileData) {
+  if (!user) {
     return <Text>No profile data found</Text>;
   }
 
@@ -158,7 +220,7 @@ const ProfileScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.userTypeContainerWrapper}>
         <View style={styles.userInfo}>
-          <Text style={styles.userInfoText}>Hello, {profileData.name}!</Text>
+          <Text style={styles.userInfoText}>Hello, {user.name}!</Text>
         </View>
         <View style={styles.innerContainer}>
           <View style={styles.scoreContainer}>
@@ -179,7 +241,7 @@ const ProfileScreen = () => {
                 )}
               </AnimatedCircularProgress>
             ) : (
-              <Text style={styles.progressText}>N/A</Text>
+              <Text style={styles.progressText}>Calculating...</Text>
             )}
             <Text style={[styles.text, { marginBottom: 5 }, { marginTop: 40 }]}>Your Wellness Score</Text>
             <Text style={styles.dateText}>({getCurrentDate()})</Text>
@@ -187,9 +249,10 @@ const ProfileScreen = () => {
           <TouchableOpacity onPress={handleInfoButton} style={styles.infoButton}>
             <Text style={styles.infoButtonText}>What's the Wellness Score?</Text>
           </TouchableOpacity>
-
           <View style={styles.riskContainer}>
-            <Text style={styles.text}>Risk of: {riskOf}</Text>
+            
+              <Text style={styles.text}>Risk of: {riskOf}</Text>
+
           </View>
         </View>
         <TouchableOpacity

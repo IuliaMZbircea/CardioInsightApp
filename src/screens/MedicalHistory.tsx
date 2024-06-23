@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { doc, getDoc } from 'firebase/firestore';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { collection, query, orderBy, limit, doc, getDoc, getDocs } from 'firebase/firestore';
 import { authentication, firestore_db } from '../../firebaseConfig';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const MedicalHistoryScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -12,7 +13,6 @@ const MedicalHistoryScreen: React.FC = () => {
   const [userType, setUserType] = useState<string>('');
   const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
     const fetchProfileData = async () => {
       try {
         const currentUser = authentication.currentUser;
@@ -21,9 +21,20 @@ const MedicalHistoryScreen: React.FC = () => {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
             const data = docSnap.data();
-            setProfileData(data.userData);
             setUserType(data.userType);
             setUser(data);
+    
+            // Fetch the latest entry from userData subcollection
+            const userDataCollectionRef = collection(docRef, 'userData');
+            const q = query(userDataCollectionRef, orderBy('createdAt', 'desc'), limit(1));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const latestDoc = querySnapshot.docs[0].data();
+              setProfileData(latestDoc);
+            } else {
+              console.log('No userData documents found');
+            }
           } else {
             console.log('No such document!');
           }
@@ -35,12 +46,16 @@ const MedicalHistoryScreen: React.FC = () => {
       }
     };
 
-    fetchProfileData();
-  }, []);
+  
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfileData();
+    }, [])
+  );
 
   const formatDate = (timestamp: any): string => {
-    const date = new Date(timestamp);
-    const options = { month: 'short', year: 'numeric' } as const;
+    const date = timestamp.toDate();
+    const options = { month: 'short', year: 'numeric', day: 'numeric' };
     return date.toLocaleDateString('en-US', options);
   };
 
@@ -81,23 +96,34 @@ const MedicalHistoryScreen: React.FC = () => {
     );
   }
 
+  // Get sorted keys of profileData
+  const sortedKeys = Object.keys(profileData).sort();
+
+  const filteredKeys = userType === 'basic' 
+    ? sortedKeys.filter(key => ['BMI', 'hr'].includes(key)) 
+    : sortedKeys;
+
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardDismissMode='on-drag'>
       <View style={styles.headerContainer}>
         <Text style={styles.header}>{user.name}</Text>
         <Text style={styles.subHeader}>{userType === 'advanced' ? 'Advanced User' : 'Basic User'}</Text>
       </View>
-      <Text style={styles.sectionHeader}>Past 12 Months</Text>
-      {Object.keys(profileData).map((key, index) => (
+      <Text style={styles.sectionHeader}>Latest Medical Data</Text>
+      {filteredKeys.map((key, index) => (
         dataLabels[key] && (
           <TouchableOpacity key={index} style={styles.itemContainer} onPress={() => handleParameterPress(key)}>
-            <View>
+            <View style={styles.leftContainer}>
               <Text style={styles.title}>{dataLabels[key]}</Text>
               <Text style={styles.value}>
                 {profileData[key]} {dataUnits[key] || ''}
               </Text>
             </View>
-            <Text style={styles.date}>{formatDate(user.createdAt)}</Text>
+            <View style={styles.rightContainer}>
+              {key !== 'createdAt' && (
+                <Icon name="chevron-forward-outline" size={24} color={styles.value.color} />
+              )}
+            </View>
           </TouchableOpacity>
         )
       ))}
@@ -138,7 +164,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionHeader: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#B83D37',
@@ -153,6 +179,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 3,
   },
+  leftContainer: {
+    flex: 1,
+  },
+  rightContainer: {
+    marginLeft: 10,
+  },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -163,10 +195,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontWeight: 'bold',
     color: '#7D7878',
-  },
-  date: {
-    fontSize: 14,
-    color: '#a0a0a0',
   },
 });
 

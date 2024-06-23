@@ -1,309 +1,247 @@
-import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, KeyboardAvoidingView, Text, SafeAreaView, TouchableOpacity, Modal } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { firestore_db } from '../../firebaseConfig';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { doc, addDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
+import { authentication, firestore_db } from '../../firebaseConfig';
+import { Picker } from '@react-native-picker/picker';
+import Icon from 'react-native-vector-icons/Ionicons';
 
-const AdvancedUserScreen = ({ route }: any) => {
-  const { docId } = route.params;
-  const [age, setAge] = useState('');
-  const [sex, setSex] = useState('');
-  const [prevCHD, setPrevCHD] = useState('');
-  const [BMI, setBMI] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
-  const [chol, setChol] = useState('');
-  const [smoker, setSmoker] = useState('');
+const NewMedicalRecordScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+
+  const [userType, setUserType] = useState<string>('');
+  const [bmi, setBmi] = useState('');
+  const [hr, setHr] = useState('');
   const [systolicBP, setSystolicBP] = useState('');
   const [diastolicBP, setDiastolicBP] = useState('');
-  const [hr, setHR] = useState('');
+  const [chol, setChol] = useState('');
   const [glucose, setGlucose] = useState('');
+  const [age, setAge] = useState('');
+  const [smoker, setSmoker] = useState('');
+  const [prevCHD, setPrevCHD] = useState('');
+  const [sex, setSex] = useState('');
 
   const [showSexPicker, setShowSexPicker] = useState(false);
   const [showCHDPicker, setShowCHDPicker] = useState(false);
   const [showSmokerPicker, setShowSmokerPicker] = useState(false);
 
-  const navigation = useNavigation<any>();
-
   useEffect(() => {
-    calculateBMI();
-  }, [height, weight]);
+    const fetchUserType = async () => {
+      const currentUser = authentication.currentUser;
+      if (currentUser) {
+        const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUserType(data.userType);
+        }
+      }
+    };
 
-  const calculateBMI = () => {
-    if (height && weight) {
-      const heightInMeters = parseFloat(height) / 100; // Convert height to meters
-      const weightInKg = parseFloat(weight);
-      const calculatedBMI = (weightInKg / (heightInMeters * heightInMeters)).toFixed(1); // Calculate BMI
-      setBMI(calculatedBMI); // Update state with calculated BMI
-    } else {
-      setBMI(''); // Clear BMI if height or weight is not entered
+    fetchUserType();
+  }, []);
+
+  const handleAddRecord = async () => {
+    const currentUser = authentication.currentUser;
+    if (currentUser) {
+      const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
+      const userDataCollectionRef = collection(docRef, 'userData');
+      const newRecord = {
+        createdAt: serverTimestamp(),
+        BMI: bmi,
+        hr: hr,
+        age,
+        smoker: smoker === 'Yes' ? '1' : '0',
+        prevCHD: prevCHD === 'Yes' ? '1' : '0',
+        sex: sex === 'Male' ? '1' : sex === 'Female' ? '2' : '',
+        systolicBP: userType === 'basic' ? '110' : systolicBP,
+        diastolicBP: userType === 'basic' ? '70' : diastolicBP,
+        chol: userType === 'basic' ? '120' : chol,
+        glucose: userType === 'basic' ? '70': glucose,
+        ...(userType === 'advanced' && { systolicBP, diastolicBP, chol, glucose }),
+      };
+
+      try {
+        await addDoc(userDataCollectionRef, newRecord);
+        alert('New medical record added successfully');
+        navigation.goBack();
+      } catch (error) {
+        console.error('Error adding document: ', error);
+        alert('Error adding medical record');
+      }
     }
   };
-
-  const handleSubmitForm = async () => {
-    try {
-      const userId = route.params.userId;
-      const medicalFileRef = doc(firestore_db, 'MedicalFiles', userId);
-      
-      // Update document with additional data and createdAt timestamp
-      await updateDoc(medicalFileRef, {
-        userData: {
-          createdAt: serverTimestamp(),
-          age: age,
-          sex: sex === 'Male' ? '1' : sex === 'Female' ? '2' : '',
-          prevCHD: prevCHD === 'Yes' ? '1' : '0',
-          BMI: BMI,
-          chol: chol,
-          smoker: smoker === 'Yes' ? '1' : '0',
-          systolicBP: systolicBP,
-          diastolicBP: diastolicBP,
-          hr: hr,
-          glucose: glucose,
-        },
-      });
-
-      // Clear form inputs after submission
-      setAge('');
-      setSex('');
-      setPrevCHD('');
-      setBMI('');
-      setChol('');
-      setSmoker('');
-      setSystolicBP('');
-      setDiastolicBP('');
-      setHR('');
-      setGlucose('');
-      setHeight('');
-      setWeight('');
-
-      // Navigate to ProfileScreen
-      navigation.navigate('ProfileScreen', {
-        userId,
-      });
-    } catch (error) {
-      console.error('Error updating document: ', error);
-    }
-  };
-
-  
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={styles.userTypeContainerWrapper}>
-        <View style={styles.userTypeContainer}>
-          <Text style={styles.userTypeTitle}>Prepare your medical file...</Text>
+    <View style={styles.container}>
 
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.formInput}
-              value={age}
-              onChangeText={(text) => setAge(text)}
-              placeholder="Age"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-            <TouchableOpacity style={styles.formInput} onPress={() => setShowSexPicker(true)}>
-              <Text style={styles.pickerText}>{sex || 'Select Gender'}</Text>
-            </TouchableOpacity>
-          </View>
+      
+      <Text style={styles.header}>New Medical Record</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Age"
+        placeholderTextColor={'#B83D37'}
+        value={age}
+        onChangeText={setAge}
+      />
+    
+      <TouchableOpacity style={styles.input} onPress={() => setShowSexPicker(true)}>
+        <Text style={{color: '#B83D37'}}>{sex || 'Gender'}</Text>
+      </TouchableOpacity>
+      
 
-          <View style={styles.formRow}>
-            <TouchableOpacity style={styles.formInput} onPress={() => setShowCHDPicker(true)}>
-              <Text style={styles.pickerText}>{prevCHD || 'Diagnosed CVD'}</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.formInput}
-              value={height}
-              onChangeText={(text) => setHeight(text)}
-              placeholder="Height (cm)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-          </View>
+      <TouchableOpacity style={styles.input} onPress={() => setShowSmokerPicker(true)}>
+        <Text style={{color: '#B83D37'}}>{smoker || 'Smoker'}</Text>
+      </TouchableOpacity>
+      
 
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.formInput}
-              value={weight}
-              onChangeText={(text) => setWeight(text)}
-              placeholder="Weight (kg)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-            <TextInput
-              style={styles.formInput}
-              value={BMI}
-              placeholder="BMI"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={false}
-            />
-          </View>
+      <TouchableOpacity style={styles.input} onPress={() => setShowCHDPicker(true)}>
+        <Text style={{color: '#B83D37'}}>{prevCHD || 'Diagnosed CVD'}</Text>
+      </TouchableOpacity>
 
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.formInput}
-              value={chol}
-              onChangeText={(text) => setChol(text)}
-              placeholder="Cholesterol (mg/dL)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-            <TouchableOpacity style={styles.formInput} onPress={() => setShowSmokerPicker(true)}>
-              <Text style={styles.pickerText}>{smoker || 'Smoker'}</Text>
-            </TouchableOpacity>
-          </View>
+      <TextInput
+        style={styles.input}
+        placeholder="BMI"
+        placeholderTextColor={'#B83D37'}
+        value={bmi}
+        onChangeText={setBmi}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Heart Rate"
+        placeholderTextColor={'#B83D37'}
+        value={hr}
+        onChangeText={setHr}
+      />
+      {userType === 'advanced' && (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Systolic BP"
+            placeholderTextColor={'#B83D37'}
+            value={systolicBP}
+            onChangeText={setSystolicBP}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Diastolic BP"
+            placeholderTextColor={'#B83D37'}
+            value={diastolicBP}
+            onChangeText={setDiastolicBP}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Cholesterol"
+            placeholderTextColor={'#B83D37'}
+            value={chol}
+            onChangeText={setChol}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Glucose"
+            placeholderTextColor={'#B83D37'}
+            value={glucose}
+            onChangeText={setGlucose}
+          />
+        </>
+      )}
+      <Button title="Add Record" onPress={handleAddRecord} />
 
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.formInput}
-              value={systolicBP}
-              onChangeText={(text) => setSystolicBP(text)}
-              placeholder="Systolic BP (mmHg)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-            <TextInput
-              style={styles.formInput}
-              value={diastolicBP}
-              onChangeText={(text) => setDiastolicBP(text)}
-              placeholder="Diastolic BP (mmHg)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-          </View>
-
-          <View style={styles.formRow}>
-            <TextInput
-              style={styles.formInput}
-              value={hr}
-              onChangeText={(text) => setHR(text)}
-              placeholder="Heart Rate (BPM)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-            <TextInput
-              style={styles.formInput}
-              value={glucose}
-              onChangeText={(text) => setGlucose(text)}
-              placeholder="Glucose (mg/dL)"
-              placeholderTextColor="#C83030"
-              keyboardType="numeric"
-              editable={true}
-            />
-          </View>
-
-          <Button title="Submit" color="#C83030" onPress={handleSubmitForm} />
-
-          <Modal visible={showSexPicker} transparent={false} animationType="slide" >
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={sex}
-                onValueChange={(itemValue: string) => {
-                  setSex(itemValue);
-                  setShowSexPicker(false);
-                }}
-              >
-                <Picker.Item label="Select Gender" value="" />
-                <Picker.Item label="Male" value="Male" />
-                <Picker.Item label="Female" value="Female" />
-              </Picker>
-            </View>
-          </Modal>
-
-          <Modal visible={showCHDPicker} transparent={true} animationType="slide">
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={prevCHD}
-                onValueChange={(itemValue: string) => {
-                  setPrevCHD(itemValue);
-                  setShowCHDPicker(false);
-                }}
-              >
-                <Picker.Item label="Diagnosed CVD" value="" />
-                <Picker.Item label="Yes" value="Yes" />
-                <Picker.Item label="No" value="No" />
-              </Picker>
-            </View>
-          </Modal>
-
-          <Modal visible={showSmokerPicker} transparent={true} animationType="slide">
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={smoker}
-                onValueChange={(itemValue: string) => {
-                  setSmoker(itemValue);
-                  setShowSmokerPicker(false);
-                }}
-              >
-                <Picker.Item label="Smoker" value="" />
-                <Picker.Item label="Yes" value="Yes" />
-                <Picker.Item label="No" value="No" />
-              </Picker>
-            </View>
-          </Modal>
+      <Modal visible={showSexPicker} transparent={true} animationType="slide">
+        <View style={styles.pickerContainer}>
+          <TouchableOpacity onPress={() => setShowSexPicker(false)}>
+            <Text style={styles.closeButton}>Close</Text>
+          </TouchableOpacity>
+          <Picker
+            selectedValue={sex}
+            onValueChange={(itemValue) => {
+              setSex(itemValue);
+              setShowSexPicker(false);
+            }}
+          >
+            <Picker.Item label="Select Sex" value="" />
+            <Picker.Item label="Male" value="Male" />
+            <Picker.Item label="Female" value="Female" />
+          </Picker>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </Modal>
+
+      <Modal visible={showSmokerPicker} transparent={true} animationType="slide">
+        <View style={styles.pickerContainer}>
+          <TouchableOpacity onPress={() => setShowSmokerPicker(false)}>
+            <Text style={styles.closeButton}>Close</Text>
+          </TouchableOpacity>
+          <Picker
+            selectedValue={smoker}
+            onValueChange={(itemValue) => {
+              setSmoker(itemValue);
+              setShowSmokerPicker(false);
+            }}
+          >
+            <Picker.Item label="Smoker" value="" />
+            <Picker.Item label="Yes" value="Yes" />
+            <Picker.Item label="No" value="No" />
+          </Picker>
+        </View>
+      </Modal>
+
+      <Modal visible={showCHDPicker} transparent={true} animationType="slide">
+        <View style={styles.pickerContainer}>
+          <TouchableOpacity onPress={() => setShowCHDPicker(false)}>
+            <Text style={styles.closeButton}>Close</Text>
+          </TouchableOpacity>
+          <Picker
+            selectedValue={prevCHD}
+            onValueChange={(itemValue) => {
+              setPrevCHD(itemValue);
+              setShowCHDPicker(false);
+            }}
+          >
+            <Picker.Item label="Diagnosed CVD" value="" />
+            <Picker.Item label="Yes" value="Yes" />
+            <Picker.Item label="No" value="No" />
+          </Picker>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
     padding: 20,
-    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
   },
-  userTypeContainerWrapper: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userTypeContainer: {
-    backgroundColor: '#EEE6E6',
-    borderRadius: 15,
-    padding: 30,
-    width: '90%',
-    marginBottom: 20,
-  },
-  userTypeTitle: {
-    color: '#C83030',
-    fontSize: 20,
+  header: {
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#B83D37',
   },
-  formRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  formInput: {
-    backgroundColor: 'white',
-    borderColor: '#C83030',
+  input: {
+    height: 40,
+    borderColor: '#E4BEBD',
     borderWidth: 1,
-    borderRadius: 5,
-    width: '48%',
+    marginBottom: 10,
     padding: 10,
-    color: '#C83030',
-    fontSize: 16,
-  },
-  pickerText: {
-    color: '#C83030',
-    fontSize: 16,
+    borderRadius: 5,
+    backgroundColor: '#fff',
   },
   pickerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: '#EEE6E6',
+    backgroundColor: '#fff',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
   },
+  closeButton: {
+    alignSelf: 'flex-end',
+    color: '#B83D37',
+    marginBottom: 10,
+  },
+  
 });
 
-export default AdvancedUserScreen;
+export default NewMedicalRecordScreen;

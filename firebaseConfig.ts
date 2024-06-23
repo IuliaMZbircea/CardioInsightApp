@@ -2,6 +2,8 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getPerformance } from "firebase/performance";
+import axios from 'axios';
 
 
 const firebaseConfig = {
@@ -19,3 +21,4 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const authentication = getAuth(app);
 export const firestore_db = getFirestore(app);
+export const perf = getPerformance(app);

@@ -23,7 +23,7 @@ const UserTypeSelectionScreen: React.FC = () => {
       if (userType === 'advanced') {
         navigation.navigate('AdvancedUserScreen', { docId: userDocRef.id });
       } else {
-        navigation.navigate('ProfileScreen', { docId: userDocRef.id });
+        navigation.navigate('BasicUserScreen', { docId: userDocRef.id });
       }
     } catch (error) {
       console.error('Error updating document: ', error);

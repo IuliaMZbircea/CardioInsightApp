@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TextInput, Button, StyleSheet, KeyboardAvoidingView, Text, SafeAreaView, TouchableOpacity, Modal } from 'react-native';
-import { updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { updateDoc, doc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { firestore_db } from '../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 
 const AdvancedUserScreen = ({ route }: any) => {
   const { docId } = route.params ?? {};
+
   const [age, setAge] = useState('');
   const [sex, setSex] = useState('');
   const [prevCHD, setPrevCHD] = useState('');
@@ -30,7 +31,6 @@ const AdvancedUserScreen = ({ route }: any) => {
     calculateBMI();
   }, [height, weight]);
 
-
   const calculateBMI = () => {
     if (height && weight) {
       const heightInMeters = parseFloat(height) / 100; // Convert height to meters
@@ -45,35 +45,24 @@ const AdvancedUserScreen = ({ route }: any) => {
   const handleSubmitForm = async () => {
     try {
       const medicalFileRef = doc(firestore_db, 'MedicalFiles', docId);
-      await updateDoc(medicalFileRef, {
-        userData: {
-          createdAt: serverTimestamp(),
-          age: age,
-          sex: sex === 'Male' ? '1' : sex === 'Female' ? '2' : '',
-          prevCHD: prevCHD === 'Yes' ? '1' : '0',
-          BMI: BMI,
-          chol: chol,
-          smoker: smoker === 'Yes' ? '1' : '0',
-          systolicBP: systolicBP,
-          diastolicBP: diastolicBP,
-          hr: hr,
-          glucose: glucose,
-        }
+      const userDataRef = collection(medicalFileRef, 'userData');
+      
+      await addDoc(userDataRef, {
+        createdAt: serverTimestamp(),
+        age: age,
+        sex: sex === 'Male' ? '1' : sex === 'Female' ? '2' : '',
+        prevCHD: prevCHD === 'Yes' ? '1' : '0',
+        BMI: BMI,
+        chol: chol,
+        smoker: smoker === 'Yes' ? '1' : '0',
+        systolicBP: systolicBP,
+        diastolicBP: diastolicBP,
+        hr: hr,
+        glucose: glucose,
       });
 
       // Clear form inputs after submission
-      setAge('');
-      setSex('');
-      setPrevCHD('');
-      setBMI('');
-      setChol('');
-      setSmoker('');
-      setSystolicBP('');
-      setDiastolicBP('');
-      setHR('');
-      setGlucose('');
-      setHeight('');
-      setWeight('');
+      clearFormInputs();
 
       // Navigate to ProfileScreen
       navigation.navigate('ProfileScreen', {
@@ -84,11 +73,26 @@ const AdvancedUserScreen = ({ route }: any) => {
     }
   };
 
+  const clearFormInputs = () => {
+    setAge('');
+    setSex('');
+    setPrevCHD('');
+    setBMI('');
+    setChol('');
+    setSmoker('');
+    setSystolicBP('');
+    setDiastolicBP('');
+    setHR('');
+    setGlucose('');
+    setHeight('');
+    setWeight('');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView style={styles.userTypeContainerWrapper}>
         <View style={styles.userTypeContainer}>
-          <Text style={styles.userTypeTitle}>Let's start with the basics...</Text>
+          <Text style={styles.userTypeTitle}>Let's start with some data...</Text>
 
           <View style={styles.formRow}>
             <View style={styles.formColumn}>
@@ -102,15 +106,19 @@ const AdvancedUserScreen = ({ route }: any) => {
                 editable={true}
               />
             </View>
-            <TouchableOpacity style={styles.formColumn} onPress={() => setShowSexPicker(true)}>
-              <Text style={styles.formInput}>{sex || 'Select Gender'}</Text>
+            <View style={styles.formColumn}>
+            <TouchableOpacity style={styles.formInput} onPress={() => setShowSexPicker(true)}>
+              <Text style={{color:'#C83030', marginTop: 10,}}>{sex || 'Select Gender'}</Text>
             </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.formRow}>
-          <TouchableOpacity style={styles.formColumn} onPress={() => setShowCHDPicker(true)}>
-              <Text style={styles.formInput}>{prevCHD || 'Diagnosed CVD'}</Text>
+          <View style={styles.formColumn}>
+            <TouchableOpacity style={styles.formInput} onPress={() => setShowCHDPicker(true)}>
+              <Text style={{color:'#C83030', marginTop: 10,}}>{prevCHD || 'Diagnosed CVD'}</Text>
             </TouchableOpacity>
+            </View>
             <View style={styles.formColumn}>
               <TextInput
                 style={styles.formInput}
@@ -119,7 +127,6 @@ const AdvancedUserScreen = ({ route }: any) => {
                 placeholder="Height (cm)"
                 placeholderTextColor="#C83030"
                 keyboardType="numeric"
-                onBlur={calculateBMI}
                 editable={true}
               />
             </View>
@@ -134,7 +141,6 @@ const AdvancedUserScreen = ({ route }: any) => {
                 placeholder="Weight (kg)"
                 placeholderTextColor="#C83030"
                 keyboardType="numeric"
-                onBlur={calculateBMI}
                 editable={true}
               />
             </View>
@@ -164,8 +170,8 @@ const AdvancedUserScreen = ({ route }: any) => {
               />
             </View>
             <View style={styles.formColumn}>
-            <TouchableOpacity style={styles.formColumn} onPress={() => setShowSmokerPicker(true)}>
-              <Text style={styles.formInput}>{smoker || 'Smoker'}</Text>
+            <TouchableOpacity style={styles.formInput} onPress={() => setShowSmokerPicker(true)}>
+              <Text style={{color:'#C83030', marginTop: 10,}}>{smoker || 'Smoker'}</Text>
             </TouchableOpacity>
             </View>
           </View>
@@ -225,7 +231,7 @@ const AdvancedUserScreen = ({ route }: any) => {
           <Modal visible={showSexPicker} transparent={false} animationType="slide" >
             <View style={styles.formColumn}>
               <Picker
-                style={styles.formInput}
+                style={styles.pickerContainer}
                 selectedValue={sex}
                 onValueChange={(itemValue: string) => {
                   setSex(itemValue);
@@ -239,9 +245,10 @@ const AdvancedUserScreen = ({ route }: any) => {
             </View>
           </Modal>
 
-          <Modal visible={showCHDPicker} transparent={true} animationType="slide">
+          <Modal visible={showCHDPicker} transparent={false} animationType="slide">
             <View style={styles.formColumn}>
               <Picker
+                style={styles.pickerContainer}
                 selectedValue={prevCHD}
                 onValueChange={(itemValue: string) => {
                   setPrevCHD(itemValue);
@@ -255,9 +262,10 @@ const AdvancedUserScreen = ({ route }: any) => {
             </View>
           </Modal>
 
-          <Modal visible={showSmokerPicker} transparent={true} animationType="slide">
+          <Modal visible={showSmokerPicker} transparent={false} animationType="slide">
             <View style={styles.formColumn}>
               <Picker
+                style={styles.pickerContainer}
                 selectedValue={smoker}
                 onValueChange={(itemValue: string) => {
                   setSmoker(itemValue);
@@ -320,16 +328,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
-  pickerText: {
-    color: '#C83030',
-    fontSize: 15,
-    textAlign: 'left',
-    
-  },
   pickerContainer: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     backgroundColor: '#EEE6E6',
+    borderRadius: 10,
   },
 });
 

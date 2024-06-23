@@ -1,64 +1,72 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from pytorch_tabnet.tab_model import TabNetClassifier
+import pandas as pd
 import pickle
+from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Load the models and scaler
-with open('models.pkl', 'rb') as f:
-    models = pickle.load(f)
+# Load trained models
+with open('ml_model.pkl', 'rb') as f:
+    model = pickle.load(f)
+    
+# Load scaler from scaler.pkl
+with open('scaler.pkl', 'rb') as f:
+    scaler = pickle.load(f)
 
-scaler = StandardScaler()
-# Assuming you saved your scaler, you would load it similarly:
-# with open('scaler.pkl', 'rb') as f:
-#     scaler = pickle.load(f)
 
-features = ['SEX', 'AGE', 'CURSMOKE', 'PREVCHD', 'TOTCHOL', 'SYSBP', 'DIABP', 'BMI', 'HEARTRTE', 'GLUCOSE']
+@app.route('/', methods=['GET'])
+def get_data():
+    return jsonify({"message": "API is Running"})
 
+# Prediction endpoint
 @app.route('/predict', methods=['POST'])
 def predict():
-    data = request.json
-    input_data = np.array([[
-        data['sex'],
-        data['age'],
-        data['smoker'],
-        data['prevCHD'],
-        data['chol'],
-        data['systolicBP'],
-        data['diastolicBP'],
-        data['BMI'],
-        data['hr'],
-        data['glucose']
-    ]], dtype=float)
 
-    # Standardize the input data
-    input_data_scaled = scaler.transform(input_data)
+    
+    data = request.get_json()
 
+    if data is None:
+        return jsonify({'error': 'No input data provided'}), 400
+    
+    # Prepare input data for prediction
+    input_data = {
+        'SEX': int(data['SEX']),
+        'AGE': int(data['AGE']),
+        'CURSMOKER': int(data['CURSMOKE']),
+        'PREVCHD': int(data['PREVCHD']),
+        'TOTCHOL': float(data['TOTCHOL']),
+        'SYSBP': float(data['SYSBP']),
+        'DIABP': float(data['DIABP']),
+        'BMI': float(data['BMI']),
+        'HEARTRTE': float(data['HEARTRTE']),
+        'GLUCOSE': float(data['GLUCOSE'])
+    }
+    
+    # Convert to DataFrame
+    input_features = pd.DataFrame([input_data])
+    
+    scaler = pickle.load(open('scaler.pkl', 'rb'))
+    input_features_scaled = scaler.transform(input_features)
+
+    # Make predictions using the models
     predictions = {}
-    for target in models:
-        clf = models[target]
-        prediction = clf.predict_proba(input_data_scaled)
-        probability = prediction[0][1]  # Probability of positive class
-        predictions[target] = probability
+    for target, models in model.items():
+        prediction = models.predict(input_features_scaled)
+        predictions[target] = prediction[0]
 
-    # Find the disease with the highest probability
-    max_probability = max(predictions.values())
-    max_target = max(predictions, key=predictions.get)
+    # Determine predicted disease based on highest risk
+    predicted_disease = max(predictions, key=predictions.get)
 
-    # Check if the highest probability is under 50%
-    if max_probability < 0.5:
-        max_target = "NO RISK"
-        max_probability = None
 
-    return jsonify({
-        'predictions': predictions,
-        'predicted_disease': max_target,
-        'probability': max_probability
-    })
+    if predicted_disease == 'ANGINA':
+        predicted_disease = 'Angina'    
+    elif predicted_disease == 'STROKE': 
+        predicted_disease = 'Stroke'
+    elif predicted_disease == 'HYPERTEN':
+        predicted_disease = 'Hypertension'
+
+    return jsonify({'predicted_disease': predicted_disease})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5002)

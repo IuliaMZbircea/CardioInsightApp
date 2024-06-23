@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, Button, TouchableOpacity, StyleSheet, KeyboardAvoidingView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { authentication } from '../../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import axios from 'axios';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ const LoginScreen = () => {
     setLoading(true);
     try {
         const response = await signInWithEmailAndPassword(authentication, email, password);
-        navigation.navigate('Tabs', { user: response.user }); // Pass user object to ProfileScreen
+        navigation.navigate('Tabs', { user: response.user });
     } catch (error: any) {
         console.error('Sign in failed:', error);
         alert('Sign in failed: ' + error.message);
@@ -23,6 +24,29 @@ const LoginScreen = () => {
     }
 };
 
+// const fetchProfileData = async () => {
+//   try {
+//     const currentUser = authentication.currentUser;
+//     if (currentUser) {
+//       // Proceed with fetching profile data
+//       const response = await axios.get('http://localhost:5002/profile', {
+//         headers: {
+//           Authorization: `Bearer ${await currentUser.getIdToken()}`,
+//         },
+//       });
+//       console.log('Profile data:', response.data);
+//     } else {
+//       console.error('No user logged in.');
+//     }
+//   } catch (error) {
+//     console.error('Error fetching profile data:', error);
+//   }
+// };
+
+// // Call fetchProfileData when component mounts
+// useEffect(() => {
+//   fetchProfileData();
+// }, []);
 
   const handleSignupRedirect = () => {
     navigation.navigate('SignupScreen');

@@ -26,7 +26,7 @@ const SignupScreen = () => {
                 email: email,
                 name: name,
                 createdAt: new Date().toISOString(),
-                hasSelectedUserType: false,  // Add this field
+                hasSelectedUserType: false,
             };
     
             await setDoc(doc(firestore_db, "MedicalFiles", userCredential.user.uid), newUser);

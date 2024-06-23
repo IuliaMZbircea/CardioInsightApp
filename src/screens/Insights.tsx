@@ -1,317 +1,268 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { doc, getDoc } from 'firebase/firestore';
 import { authentication, firestore_db } from '../../firebaseConfig';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { LineChart } from 'react-native-chart-kit';
 
-const InsightsScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+type Condition = 'angina' | 'hypertension' | 'stroke' | 'general';
 
+const InsightsScreen = () => {
+  const navigation = useNavigation();
   const [profileData, setProfileData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [randomHabits, setRandomHabits] = useState<string[]>([]);
+  const [riskOf, setRiskOf] = useState<Condition>('general'); // Simulated test value
   const [userType, setUserType] = useState<string>('');
   const [user, setUser] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const currentUser = authentication.currentUser;
-        if (currentUser) {
-          const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setProfileData(data.userData);
-            setUserType(data.userType);
-            setUser(data);
+  // Hardcoded ideal patient data
+  const idealPatientData = {
+    chol: 120,
+    systolicBP: 110,
+    diastolicBP: 70,
+    BMI: 21.7,
+    hr: 70,
+    glucose: 70
+  };
+
+  const fetchProfileData = async () => {
+    try {
+      const currentUser = authentication.currentUser;
+      if (currentUser) {
+        const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUserType(data.userType);
+          setUser(data);
+
+          const userDataCollectionRef = collection(docRef, 'userData');
+          const q = query(userDataCollectionRef, orderBy('createdAt', 'desc'), limit(1));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const latestDoc = querySnapshot.docs[0].data();
+            setProfileData(latestDoc);
+            setRandomHabits(selectRandomHabits(riskOf));
           } else {
             console.log('No such document!');
           }
         }
-      } catch (error) {
-        console.error('Error fetching profile data:', error);
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectRandomHabits = (condition: Condition): string[] => {
+    const healthyHabits = {
+      angina: [
+        "Engage in light physical activities like walking or gentle yoga.",
+        "Avoid heavy meals and eat smaller, more frequent meals.",
+        "Manage stress through breathing exercises and mindfulness.",
+        "Avoid extreme temperatures; stay cool in summer and warm in winter.",
+        "Limit caffeine intake to reduce heart strain.",
+        "Take prescribed medications regularly and follow up with your doctor.",
+        "Include omega-3 fatty acids in your diet from sources like fish or flaxseed.",
+        "Practice relaxation techniques to control anxiety and improve heart function.",
+        "Stay hydrated but avoid excessive fluid intake at once."
+      ],
+      hypertension: [
+        "Reduce salt intake by avoiding processed foods and reading food labels.",
+        "Practice relaxation techniques such as meditation or deep breathing.",
+        "Increase intake of potassium-rich foods like bananas and spinach.",
+        "Maintain a healthy weight to reduce blood pressure strain.",
+        "Exercise regularly, aiming for at least 30 minutes of moderate activity most days.",
+        "Limit alcohol consumption to no more than one drink per day for women and two for men.",
+        "Avoid smoking and exposure to secondhand smoke.",
+        "Monitor blood pressure at home and keep a log for your doctor.",
+        "Reduce intake of saturated fats and cholesterol to maintain healthy blood vessels."
+      ],
+      stroke: [
+        "Participate in physical therapy to improve mobility and strength.",
+        "Follow a diet low in saturated fats and high in fiber.",
+        "Take medications as prescribed and attend regular check-ups.",
+        "Engage in cognitive exercises to improve brain function.",
+        "Stay physically active within your limits to improve circulation.",
+        "Control diabetes through diet, exercise, and medication if needed.",
+        "Avoid excessive alcohol consumption to reduce stroke risk.",
+        "Manage stress through support groups, therapy, or relaxation techniques.",
+        "Monitor for signs of stroke and seek immediate help if they occur."
+      ],
+      general: [
+        "Maintain a balanced diet rich in fruits, vegetables, and whole grains.",
+        "Engage in regular physical activity such as brisk walking, jogging, or cycling.",
+        "Quit smoking and avoid exposure to secondhand smoke.",
+        "Manage stress through relaxation techniques like yoga or meditation.",
+        "Monitor blood pressure and cholesterol levels regularly as per your doctor's advice.",
+        "Limit alcohol consumption to moderate levels.",
+        "Ensure adequate sleep of at least 7-8 hours per night.",
+        "Stay hydrated by drinking plenty of water throughout the day.",
+        "Maintain a healthy weight through a combination of diet and exercise.",
+        "Practice good hygiene to prevent infections.",
+        "Get regular health check-ups and screenings.",
+        "Stay socially connected to support mental health.",
+        "Avoid excessive sugar intake to prevent diabetes and other health issues."
+      ]
     };
 
+    const habits = healthyHabits[condition] || healthyHabits.general;
+    return habits.sort(() => 0.5 - Math.random()).slice(0, 3);
+  };
+
+  useEffect(() => {
     fetchProfileData();
   }, []);
 
-  const formatDate = (timestamp: any): string => {
-    const date = new Date(timestamp);
-    const options = { month: 'short', year: 'numeric' } as const;
-    return date.toLocaleDateString('en-US', options);
-  };
-
-  const dataLabels: { [key: string]: string } = {
-    BMI: 'BMI',
-    chol: 'Cholesterol',
-    diastolicBP: 'Avg Diastolic BP',
-    glucose: 'Glucose',
-    hr: 'Avg Heart Rate',
-    systolicBP: 'Avg Systolic BP',
-  };
-
-  const dataUnits: { [key: string]: string } = {
-    systolicBP: 'mmHg',
-    diastolicBP: 'mmHg',
-    chol: 'mg/dL',
-    glucose: 'mg/dL',
-    hr: 'BPM',
-  };
-
-  const handleParameterPress = (key: string) => {
-    navigation.navigate('ParameterDetailsScreen', { parameterKey: key, userId: authentication.currentUser?.uid });
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#C83030" />
-      </View>
-    );
+  if (loading || !profileData) {
+    return <ActivityIndicator size="large" color="rgba(200, 48, 48, 0.6)" />;
   }
 
-  if (!profileData) {
-    return (
-      <View style={styles.container}>
-        <Text>No medical data found</Text>
+const lineChartData = {
+  labels: userType === 'basic' ? ['BMI', 'HR'] : ['Chol', 'Sys-BP', 'Dia-BP', 'BMI', 'HR', 'Glucose'],
+  datasets: [
+    {
+      data: userType === 'basic' 
+          ? [profileData.BMI, profileData.hr]
+          : [
+            profileData.chol,
+            profileData.systolicBP,
+            profileData.diastolicBP,
+            profileData.BMI,
+            profileData.hr,
+            profileData.glucose
+      ],
+      color: (opacity = 1) => `rgba(200, 48, 48, ${opacity})`,
+      strokeWidth: 2, 
+      legendLabel: user.name, 
+    },
+    {
+      data: userType === 'basic' 
+          ? [idealPatientData.BMI, idealPatientData.hr]
+          : [
+            idealPatientData.chol,
+            idealPatientData.systolicBP,
+            idealPatientData.diastolicBP,
+            idealPatientData.BMI,
+            idealPatientData.hr,
+            idealPatientData.glucose
+          ],
+      color: (opacity = 1) => `rgba(190, 229, 71, ${opacity})`,
+      strokeWidth: 2, 
+      legendLabel: 'Ideal Values', 
+    },
+  ],
+};
+const CustomLegend = () => (
+  <View style={styles.legendContainer}>
+    {lineChartData.datasets.map((dataset, index) => (
+      <View key={index} style={styles.legendItem}>
+        <View style={[styles.legendIndicator, { backgroundColor: dataset.color(1) }]} />
+        <Text style={styles.legendText}>{dataset.legendLabel}</Text>
       </View>
-    );
-  }
+    ))}
+  </View>
+);
+
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardDismissMode='on-drag'>
-      <View style={styles.headerContainer}>
-        <Text style={styles.header}>{user.name}</Text>
-        <Text style={styles.subHeader}>{userType === 'advanced' ? 'Advanced User' : 'Basic User'}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>User Data Parameters</Text>
+          <LineChart
+            data={lineChartData}
+            width={Dimensions.get('window').width - 40} // from react-native
+            height={220}
+            yAxisLabel=""
+            chartConfig={{
+              backgroundColor: '#F8F3F3',
+              backgroundGradientFrom: '#F8F3F3',
+              backgroundGradientTo: '#F8F3F3',
+              decimalPlaces: 2,
+              color: (opacity = 1) => `rgba(200, 48, 48, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(200, 48, 48, ${opacity})`,
+              style: {
+                borderRadius: 10
+              },
+              propsForDots: {
+                r: "6",
+                strokeWidth: "2",
+                stroke: "#C83030"
+              }
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 10
+            }}
+          />
+          <CustomLegend />
+          </View>
+          <View>
+            <Text style={styles.title}>Healthy Habits Handbook</Text>
+          {randomHabits.map((habit, index) => (
+            <Text key={index} style={styles.habitText}>{`${index + 1}. ${habit}`}</Text>
+          ))}
+          
+        </View>
       </View>
-      <Text style={styles.sectionHeader}>Past 12 Months</Text>
-      {Object.keys(profileData).map((key, index) => (
-        dataLabels[key] && (
-          <TouchableOpacity key={index} style={styles.itemContainer} onPress={() => handleParameterPress(key)}>
-            <View>
-              <Text style={styles.title}>{dataLabels[key]}</Text>
-              <Text style={styles.value}>
-                {profileData[key]} {dataUnits[key] || ''}
-              </Text>
-            </View>
-            <Text style={styles.date}>{formatDate(user.createdAt)}</Text>
-          </TouchableOpacity>
-        )
-      ))}
-    </ScrollView>
+    </SafeAreaView>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    padding: 10,
-    paddingBottom: 20,
-    paddingTop: 10,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
+  safeArea: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
-  headerContainer: {
-    backgroundColor: '#EEE6E6',
-    padding: 10,
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  contentContainer: {
+    backgroundColor: '#F8F3F3',
     borderRadius: 10,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  header: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 2,
-    color: '#B83D37',
-  },
-  subHeader: {
-    fontSize: 15,
-    color: '#E4BEBD',
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  sectionHeader: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#B83D37',
-  },
-  itemContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
-    marginVertical: 10,
-    backgroundColor: '#EEE6E6',
-    borderRadius: 10,
-    elevation: 3,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#B83D37',
+    color: '#C83030',
+    marginBottom: 10,
   },
-  value: {
-    fontSize: 26,
-    marginTop: 5,
-    fontWeight: 'bold',
-    color: '#7D7878',
+  habitText: {
+    fontSize: 18,
+    marginTop:10,
+    lineHeight: 24,
+    color: '#D68E8D',
+    marginBottom: 10,
   },
-  date: {
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 5,
+  },
+  legendText: {
     fontSize: 14,
-    color: '#a0a0a0',
+    color: '#333',
   },
 });
 
+
 export default InsightsScreen;
-
-
-// import React, { useEffect, useState } from 'react';
-// import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
-// import { StackedBarChart } from 'react-native-chart-kit';
-// import { useNavigation } from '@react-navigation/native';
-// import { doc, getDoc } from 'firebase/firestore';
-// import { authentication, firestore_db } from '../../firebaseConfig';
-
-
-// const InsightsScreen: React.FC = () => {
-//   const navigation = useNavigation<any>();
-
-//   const [chartData, setChartData] = useState<{
-//     labels: string[],
-//     data: number[][],
-//     legend: string[],
-//     barColors: string[]
-//   }>({
-//     labels: [],
-//     data: [],
-//     legend: ['Prev CHD', 'Cholesterol', 'Systolic BP', 'Diastolic BP', 'Smoker', 'BMI', 'Heart Rate', 'Glucose'],
-//     barColors: ['#B83D37', '#E4BEBD', '#7D7878', '#EEE6E6', '#C83030', '#A0A0A0', '#B83D37', '#E4BEBD', '#7D7878', '#EEE6E6'],
-//   });
-//   const [loading, setLoading] = useState(true);
-//   const [parameterRanges, setParameterRanges] = useState<ParameterRanges>({
-//     prevCHD: { min: 0, max: 1, ideal: 0 },
-//     chol: { min: 100, max: 200, ideal: 120 },
-//     systolicBP: { min: 90, max: 120, ideal: 110 },
-//     diastolicBP: { min: 60, max: 80, ideal: 70 },
-//     smoker: { min: 0, max: 1, ideal: 0 },
-//     BMI: { min: 18.5, max: 24.9, ideal: 21.7 },
-//     hr: { min: 60, max: 100, ideal: 70 },
-//     glucose: { min: 70, max: 100, ideal: 70 },
-//   });
-
-//   useEffect(() => {
-//     const fetchChartData = async () => {
-//       try {
-//         const currentUser = authentication.currentUser;
-//         if (currentUser) {
-//           const docRef = doc(firestore_db, 'MedicalFiles', currentUser.uid);
-//           const docSnap = await getDoc(docRef);
-//           if (docSnap.exists()) {
-//             const data = docSnap.data() as HealthData;
-
-//             // Validate data before setting state
-//             const validData = [
-//               data.prevCHD ?? 0,
-//               data.chol ?? 0,
-//               data.systolicBP ?? 0,
-//               data.diastolicBP ?? 0,
-//               data.smoker ?? 0,
-//               data.BMI ?? 0,
-//               data.hr ?? 0,
-//               data.glucose ?? 0,
-//             ].map(value => (isNaN(value) ? 0 : value));
-
-//             setChartData({
-//               labels: ['Prev CHD', 'Cholesterol', 'Systolic BP', 'Diastolic BP', 'Smoker', 'BMI', 'Heart Rate', 'Glucose'],
-//               data: [validData],
-//               legend: ['Prev CHD', 'Cholesterol', 'Systolic BP', 'Diastolic BP', 'Smoker', 'BMI', 'Heart Rate', 'Glucose'],
-//               barColors: ['#B83D37', '#E4BEBD', '#7D7878', '#EEE6E6', '#C83030', '#A0A0A0', '#B83D37', '#E4BEBD', '#7D7878', '#EEE6E6'],
-//             });
-//           } else {
-//             console.log('Document does not exist');
-//           }
-//         } else {
-//           console.log('No current user found');
-//         }
-//       } catch (error) {
-//         console.error('Error fetching chart data:', error);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchChartData();
-//   }, []);
-
-//   if (loading) {
-//     return (
-//       <View style={styles.loadingContainer}>
-//         <ActivityIndicator size="large" color="#C83030" />
-//       </View>
-//     );
-//   }
-
-//   return (
-//     <ScrollView contentContainerStyle={styles.container} keyboardDismissMode='on-drag'>
-//       <Text style={styles.sectionHeader}>Health Insights</Text>
-//       <StackedBarChart
-//         style={styles.chart}
-//         data={{
-//           labels: chartData.labels,
-//           legend: chartData.legend,
-//           data: chartData.data,
-//           barColors: chartData.barColors,
-//         }}
-//         width={Dimensions.get('window').width - 20}
-//         height={400}
-//         hideLegend={false}
-//         chartConfig={{
-//           backgroundGradientFrom: '#f5f5f5',
-//           backgroundGradientTo: '#f5f5f5',
-//           decimalPlaces: 0,
-//           color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-//           labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-//           style: {
-//             borderRadius: 10,
-//           },
-//         }}
-//       />
-//     </ScrollView>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   container: {
-//     padding: 10,
-//     paddingBottom: 20,
-//     paddingTop: 10,
-//     backgroundColor: '#f5f5f5',
-//   },
-//   loadingContainer: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     backgroundColor: '#f5f5f5',
-//   },
-//   sectionHeader: {
-//     fontSize: 24,
-//     fontWeight: 'bold',
-//     marginBottom: 15,
-//     color: '#B83D37',
-//     textAlign: 'center',
-//   },
-//   chart: {
-//     marginVertical: 8,
-//     borderRadius: 16,
-//   },
-// });
-
-// export default InsightsScreen;
