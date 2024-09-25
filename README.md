@@ -3,6 +3,8 @@
 ## Description
 **CardioInsight** is a mobile app developed with React Native and Expo for monitoring cardiovascular health and risk assessment. It uses Firebase for database management and authentication and a TabNet Classifier model in Python for predicting cardiovascular diseases.
 
+![CardioInsight App](mockup/layout.png "CardioInsight App Screenshot")
+
 ## System Requirements
 - Node.js
 - Expo CLI
